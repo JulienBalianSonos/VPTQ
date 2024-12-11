@@ -403,14 +403,30 @@ class NPVectorQuantizer:
                 vector_weights, _ = self.res_reshaper[idx].matrix2vectors(train_weights)
 
                 # kmean
-                _kmeans = cuml.cluster.KMeans(
-                    n_clusters=num_centroids,
-                    tol=self.tol,
-                    init="random",
-                    max_iter=self.iter,
-                    random_state=0,
-                    n_init=1,
-                )
+                if self.kmeans_implem == KmeansImplem.CUML:
+                    import cuml
+                    _kmeans = cuml.cluster.KMeans(
+                        n_clusters=num_centroids,
+                        tol=self.tol,
+                        init="random",
+                        max_iter=self.iter,
+                        random_state=0,
+                        n_init=1,
+                    )
+                elif self.kmeans_implem == KmeansImplem.SKLEARN_MINIBATCH:
+                    import sklearn.cluster
+                    _kmeans = sklearn.cluster.MiniBatchKMeans(
+                        n_clusters=num_centroids,
+                        tol=self.tol,
+                        init="random",
+                        max_iter=self.iter,
+                        random_state=0,
+                        n_init=1,
+                        batch_size=1024,
+                    )
+                else:
+                    raise NotImplementedError()
+
 
                 self.logger.info(
                     f"kmeans_mode: {self.kmeans_mode}, cuml kmeans, {num_centroids} clusters"
