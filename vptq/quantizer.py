@@ -3,15 +3,21 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
+import enum
 import math
 from dataclasses import dataclass, field
 from typing import List, Tuple
 
-import cuml
 import numpy as np
 import torch
 
 from vptq.utils.reshape import reshape
+
+
+class KmeansImplem(str, enum.Enum):
+    CUML = "cuml"
+    SKLEARN = "sklearn_minibatch"
+    SKLEARN_MINIBATCH = "sklearn_minibatch"
 
 
 @dataclass
@@ -30,6 +36,7 @@ class QuantizationArguments:
     enable_norm: bool = field(default=False)
     norm_dim: int = field(default=0)
     enable_perm: bool = field(default=False)
+    kmeans_implem: KmeansImplem = field(default=KmeansImplem.CUML)
 
 
 # N-percent outlier Vector Quantizator
@@ -57,6 +64,7 @@ class NPVectorQuantizer:
         norm_dim: int = 0,
         enable_perm: bool = False,
         debug: bool = False,
+        kmeans_implem: KmeansImplem = KmeansImplem.CUML
         # loaded_weights: dict = None,
     ):
 
@@ -119,6 +127,8 @@ class NPVectorQuantizer:
         # debug
         self.debug = debug
         self.logger = logger
+
+        self.kmeans_implem = kmeans_implem
 
         # prefix layer name
         self.prefix_layer_name = "model.layers."
@@ -253,14 +263,29 @@ class NPVectorQuantizer:
                 vector_weights, _ = self.reshaper[idx].matrix2vectors(train_weights)
 
                 # kmeans centroids from weight
-                _kmeans = cuml.cluster.KMeans(
-                    n_clusters=num_centroids,
-                    tol=self.tol,
-                    init="random",
-                    max_iter=self.iter,
-                    random_state=0,
-                    n_init=1,
-                )
+                if self.kmeans_implem == KmeansImplem.CUML:
+                    import cuml
+                    _kmeans = cuml.cluster.KMeans(
+                        n_clusters=num_centroids,
+                        tol=self.tol,
+                        init="random",
+                        max_iter=self.iter,
+                        random_state=0,
+                        n_init=1,
+                    )
+                elif self.kmeans_implem == KmeansImplem.SKLEARN_MINIBATCH:
+                    import sklearn.cluster
+                    _kmeans = sklearn.cluster.MiniBatchKMeans(
+                        n_clusters=num_centroids,
+                        tol=self.tol,
+                        init="random",
+                        max_iter=self.iter,
+                        random_state=0,
+                        n_init=1,
+                        batch_size=1024,
+                    )
+                else:
+                    raise NotImplementedError()
 
                 vector_weights = (
                     vector_weights.mean(dim=1) if vector_weights is not None else None
