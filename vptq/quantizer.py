@@ -133,6 +133,32 @@ class NPVectorQuantizer:
         # prefix layer name
         self.prefix_layer_name = "model.layers."
 
+    def kmeans_model(self, num_centroids: int):
+        if self.kmeans_implem == KmeansImplem.CUML:
+            import cuml
+            _kmeans = cuml.cluster.KMeans(
+                n_clusters=num_centroids,
+                tol=self.tol,
+                init="random",
+                max_iter=self.iter,
+                random_state=0,
+                n_init=1,
+            )
+        elif self.kmeans_implem == KmeansImplem.SKLEARN_MINIBATCH:
+            import sklearn.cluster
+            _kmeans = sklearn.cluster.MiniBatchKMeans(
+                n_clusters=num_centroids,
+                tol=self.tol,
+                init="random",
+                max_iter=self.iter,
+                random_state=0,
+                n_init=1,
+                batch_size=4096,
+            )
+        else:
+            raise NotImplementedError()
+        return _kmeans
+
     def init_norm(self, weight):
         self.weight_scale = torch.std(weight, dim=self.norm_dim)
         self.weight_bias = torch.mean(weight, dim=self.norm_dim)
@@ -263,29 +289,7 @@ class NPVectorQuantizer:
                 vector_weights, _ = self.reshaper[idx].matrix2vectors(train_weights)
 
                 # kmeans centroids from weight
-                if self.kmeans_implem == KmeansImplem.CUML:
-                    import cuml
-                    _kmeans = cuml.cluster.KMeans(
-                        n_clusters=num_centroids,
-                        tol=self.tol,
-                        init="random",
-                        max_iter=self.iter,
-                        random_state=0,
-                        n_init=1,
-                    )
-                elif self.kmeans_implem == KmeansImplem.SKLEARN_MINIBATCH:
-                    import sklearn.cluster
-                    _kmeans = sklearn.cluster.MiniBatchKMeans(
-                        n_clusters=num_centroids,
-                        tol=self.tol,
-                        init="random",
-                        max_iter=self.iter,
-                        random_state=0,
-                        n_init=1,
-                        batch_size=4096,
-                    )
-                else:
-                    raise NotImplementedError()
+                _kmeans = self.kmeans_model(num_centroids)
 
                 vector_weights = (
                     vector_weights.mean(dim=1) if vector_weights is not None else None
@@ -403,29 +407,7 @@ class NPVectorQuantizer:
                 vector_weights, _ = self.res_reshaper[idx].matrix2vectors(train_weights)
 
                 # kmean
-                if self.kmeans_implem == KmeansImplem.CUML:
-                    import cuml
-                    _kmeans = cuml.cluster.KMeans(
-                        n_clusters=num_centroids,
-                        tol=self.tol,
-                        init="random",
-                        max_iter=self.iter,
-                        random_state=0,
-                        n_init=1,
-                    )
-                elif self.kmeans_implem == KmeansImplem.SKLEARN_MINIBATCH:
-                    import sklearn.cluster
-                    _kmeans = sklearn.cluster.MiniBatchKMeans(
-                        n_clusters=num_centroids,
-                        tol=self.tol,
-                        init="random",
-                        max_iter=self.iter,
-                        random_state=0,
-                        n_init=1,
-                        batch_size=4096,
-                    )
-                else:
-                    raise NotImplementedError()
+                _kmeans = self.kmeans_model(num_centroids)
 
 
                 self.logger.info(
