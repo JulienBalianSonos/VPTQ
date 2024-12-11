@@ -282,7 +282,7 @@ class NPVectorQuantizer:
                         max_iter=self.iter,
                         random_state=0,
                         n_init=1,
-                        batch_size=1024,
+                        batch_size=4096,
                     )
                 else:
                     raise NotImplementedError()
@@ -422,7 +422,7 @@ class NPVectorQuantizer:
                         max_iter=self.iter,
                         random_state=0,
                         n_init=1,
-                        batch_size=1024,
+                        batch_size=4096,
                     )
                 else:
                     raise NotImplementedError()
