@@ -296,7 +296,7 @@ class NPVectorQuantizer:
                 _kmeans.fit(sub_vectors, sample_weight=vector_weights)
 
                 self.logger.info(
-                    f"cuml kmeans {_kmeans.n_iter_} iterations, error {_kmeans.inertia_}"
+                    f"'{self.kmeans_implem}' kmeans {_kmeans.n_iter_} iterations, error {_kmeans.inertia_}"
                 )
 
                 self.centroids[idx] = torch.from_numpy(_kmeans.cluster_centers_).to(
