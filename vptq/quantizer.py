@@ -15,6 +15,7 @@ from vptq.utils.reshape import reshape
 
 
 class KmeansImplem(str, enum.Enum):
+    TORCH = "torch"
     CUML = "cuml"
     SKLEARN = "sklearn_minibatch"
     SKLEARN_MINIBATCH = "sklearn_minibatch"
@@ -37,6 +38,65 @@ class QuantizationArguments:
     norm_dim: int = field(default=0)
     enable_perm: bool = field(default=False)
     kmeans_implem: KmeansImplem = field(default=KmeansImplem.CUML)
+
+
+class TorchKmeans:
+
+    """
+    pip install torch_kmeans
+    """
+
+    def __init__(self, **kwargs):
+        from torch_kmeans import KMeans
+        self._kmeans = KMeans(
+            **kwargs
+        )
+        self.n_iter_ = None
+        self.inertia_ = None
+        self.labels_ = None
+        self.cluster_centers_ = None
+
+    def fit(self, sub_vectors, sample_weight):
+        sub_vectors = torch.from_numpy(sub_vectors).unsqueeze(0)
+        self._kmeans.fit(sub_vectors)
+        res = self._kmeans._result
+        self.cluster_centers_ = res.centers[0].detach().cpu().numpy()
+        self.labels_ = res.labels[0].cpu().numpy()
+        self.inertia_ = res.inertia[0]
+
+
+def get_kmeans_algo(kmeans_implem: KmeansImplem, iter: int, tol: float, num_centroids: int):
+    if kmeans_implem == KmeansImplem.CUML:
+        import cuml
+        _kmeans = cuml.cluster.KMeans(
+            n_clusters=num_centroids,
+            tol=tol,
+            init="random",
+            max_iter=iter,
+            random_state=0,
+            n_init=1,
+        )
+    elif kmeans_implem == KmeansImplem.SKLEARN_MINIBATCH:
+        import sklearn.cluster
+        _kmeans = sklearn.cluster.MiniBatchKMeans(
+            n_clusters=num_centroids,
+            tol=tol,
+            init="random",
+            max_iter=iter,
+            random_state=0,
+            n_init=1,
+            batch_size=4096,
+        )
+    elif kmeans_implem == KmeansImplem.TORCH:
+        _kmeans = TorchKmeans(
+            n_clusters=num_centroids,
+            max_iter=iter,
+            tolerance=tol,
+        )
+
+    else:
+        raise NotImplementedError()
+    return _kmeans
 
 
 # N-percent outlier Vector Quantizator
@@ -155,6 +215,13 @@ class NPVectorQuantizer:
                 n_init=1,
                 batch_size=4096,
             )
+        elif self.kmeans_implem == KmeansImplem.KmeansGPU:
+            _kmeans = KmeansTorchGPU(
+                n_clusters=num_centroids,
+                max_iter=self.iter,
+                tolerance=self.tol,
+            )
+
         else:
             raise NotImplementedError()
         return _kmeans
@@ -292,7 +359,7 @@ class NPVectorQuantizer:
                 if new_num_centroid != num_centroids:
                     self.logger.info(f"requested num centroids: {num_centroids} over {new_num_centroid} samples")
                 # kmeans centroids from weight
-                _kmeans = self.kmeans_model(num_centroids)
+                _kmeans = get_kmeans_algo(self.kmeans_implem, iter=self.iter, tol=self.tol, num_centroids=num_centroids)
 
                 vector_weights = (
                     vector_weights.mean(dim=1) if vector_weights is not None else None
@@ -414,7 +481,7 @@ class NPVectorQuantizer:
                 new_num_centroid = min(vector_weights.shape[0], num_centroids)
                 if new_num_centroid != num_centroids:
                     self.logger.info(f"requested num centroids: {num_centroids} over {new_num_centroid} samples")
-                _kmeans = self.kmeans_model(num_centroids)
+                _kmeans = get_kmeans_algo(self.kmeans_implem, iter=self.iter, tol=self.tol, num_centroids=num_centroids)
 
 
                 self.logger.info(
@@ -505,7 +572,6 @@ class NPVectorQuantizer:
                 res_indices = dist.argmin(dim=-1)
 
                 # self.logger.info(f'residual indices type: {type(res_indices), res_indices.shape}')
-
                 # self.logger.info(f'keys: {self.res_indices.keys()}, cidx: {cidx}')
 
                 if cidx not in self.res_indices:
