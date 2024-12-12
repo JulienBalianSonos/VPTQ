@@ -288,6 +288,9 @@ class NPVectorQuantizer:
                 )
                 vector_weights, _ = self.reshaper[idx].matrix2vectors(train_weights)
 
+                new_num_centroid = min(vector_weights.shape[0], num_centroids)
+                if new_num_centroid != num_centroids:
+                    self.logger.info(f"requested num centroids: {num_centroids} over {new_num_centroid} samples")
                 # kmeans centroids from weight
                 _kmeans = self.kmeans_model(num_centroids)
 
@@ -297,6 +300,7 @@ class NPVectorQuantizer:
 
                 # convert to numpy and float32 to avoid error
                 sub_vectors = sub_vectors.to(torch.float32).cpu().numpy()
+                vector_weights = vector_weights.to(torch.float32).cpu().numpy()
                 _kmeans.fit(sub_vectors, sample_weight=vector_weights)
 
                 self.logger.info(
