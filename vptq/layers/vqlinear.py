@@ -115,7 +115,7 @@ class VQuantLinear(nn.Module):
             ), "Currently outlier only support vector quant on out_features"
             assert (
                 self.outlier_num_res_centroids == -1
-            ), "Currently do not support residual quant on outliers"
+            ), f"Currently do not support residual quant on outliers {self.outlier_num_res_centroids}"
             self.outlier_centroids = nn.Embedding(
                 1,
                 self.outlier_num_centroids * self.outlier_vector_len,
@@ -525,9 +525,9 @@ class VQuantLinear(nn.Module):
             #     print(f'res_indices: {res_indices.shape}')
 
         else:
-            indices = self.indices.view(torch.uint16).to(torch.int64)
+            indices = self.indices.to(torch.uint16).to(torch.int64)
             if self.enable_residual:
-                res_indices = self.res_indices.view(torch.uint16).to(torch.int64)
+                res_indices = self.res_indices.to(torch.uint16).to(torch.int64)
 
         indices = indices.unsqueeze(-1).expand(-1, -1, -1, self.vector_len)
 
@@ -593,7 +593,7 @@ class VQuantLinear(nn.Module):
                 1, self.outlier_num_centroids, self.outlier_vector_len
             )
 
-            outlier_indices = self.outlier_indices.view(torch.uint16).to(torch.int64)
+            outlier_indices = self.outlier_indices.to(torch.uint16).to(torch.int64)
 
             outlier_indices = outlier_indices.unsqueeze(-1).expand(
                 -1, -1, -1, self.outlier_vector_len
@@ -622,7 +622,7 @@ class VQuantLinear(nn.Module):
         if self.enable_perm:
             if self.is_indice_packed:
                 invert_perm = torch.argsort(
-                    self.perm.view(torch.uint16).to(torch.int64)
+                    self.perm.to(torch.uint16).to(torch.int64)
                 )
             else:
                 invert_perm = torch.argsort(self.perm)
