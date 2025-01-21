@@ -68,7 +68,7 @@ def pack_index(
     )
     assert torch.allclose(
         indice.view(index_dtype).to(torch.int64),
-        unpack_indices[0],
+        unpack_indices[0][:, :indice.shape[-1]],
     )
 
     assert torch.allclose(
@@ -81,7 +81,7 @@ def pack_index(
             res_indice.shape[-1] if res_indice is not None else 0,
             index_dtype=index_dtype,
             as_dtype=as_dtype,
-        )[0],
+        )[0][:, :indice.shape[-1]],
     )
     if res_indice is not None:
         assert torch.allclose(
