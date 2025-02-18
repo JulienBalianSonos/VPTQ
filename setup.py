@@ -22,6 +22,11 @@ def get_version():
     return "0.0.1"
 
 
+cmdclass = {"build_ext": BuildExtension}
+if platform.system().lower() == "darwin":
+    cmdclass = {}
+
+
 def build_cuda_extensions():
     if os.getenv("SKIP_COMPILE", "0") == "1" or platform.system().lower() == "darwin":
         print("Skipping CUDA/ROCm extension compilation due to SKIP_COMPILE setting")
@@ -113,5 +118,5 @@ setup(
     install_requires=get_requirements(),
     version=get_version(),
     ext_modules=build_cuda_extensions(),
-    cmdclass={"build_ext": BuildExtension},
+    cmdclass=cmdclass,
 )
